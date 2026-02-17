@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 set -euo pipefail
 
 export DETERMINATE_NIX_INSTALL_URL="https://install.determinate.systems/nix?ci=buildkite"

@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 set -euo pipefail
 
 export MAGIC_NIX_CACHE_LISTEN="127.0.0.1:37515"
