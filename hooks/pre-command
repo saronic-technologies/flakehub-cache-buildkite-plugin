@@ -1,0 +1,83 @@
+#!/bin/bash
+set -euo pipefail
+
+export DETERMINATE_NIX_INSTALL_URL="https://install.determinate.systems/nix?ci=buildkite"
+export MAGIC_NIX_CACHE_CLOSURE_URL="https://install.determinate.systems/magic-nix-cache-closure/branch/main/X64-Linux?ci=buildkite"
+export MAGIC_NIX_CACHE_LISTEN="127.0.0.1:37515"
+
+if ! determinate-nixd version &> /dev/null; then
+  echo "Installing Determinate Nix"
+
+  curl --proto '=https' --tlsv1.2 -sSf -L "${DETERMINATE_NIX_INSTALL_URL}" | \
+    sh -s -- install linux \
+      --no-confirm \
+      --init none
+
+  nohup /usr/local/bin/determinate-nixd daemon &
+  export NIX_REMOTE="daemon"
+
+  echo "Waiting for Determinate Nixd status"
+
+  while ! determinate-nixd status &>/dev/null; do
+    sleep 0.1;
+  done
+
+  echo "Determinate Nix installed"
+else
+  echo "Determinate Nix detected, skipping install"
+fi
+
+# Set PATH to include Nix-created directories and persist that environment variable in a file
+PATH="${PATH}:/root/.nix-profile/bin/"
+
+echo "Fetching OIDC token for Buildkite"
+
+buildkite_oidc_token="$(\
+  buildkite-agent oidc request-token \
+  --claim 'organization_id' \
+  --claim 'pipeline_id' \
+  --audience "api.flakehub.com" \
+)"
+
+echo "Logging in to FlakeHub using OIDC token"
+
+echo "${buildkite_oidc_token}" | determinate-nixd login token --token-file /dev/stdin
+
+if ! command -v magic-nix-cache > /dev/null; then
+  echo "Installing Magic Nix Cache"
+
+  magic_nix_cache_closure="$(curl -L "${MAGIC_NIX_CACHE_CLOSURE_URL}" |
+    xz -d |
+    sudo "$(which nix-store)" --import |
+    tail -n1 |
+    head -n1
+  )"
+  sudo ln -sf "${magic_nix_cache_closure}/bin/magic-nix-cache" /usr/bin/magic-nix-cache
+else
+  echo "magic-nix-cache detected, skipping install"
+fi
+
+magic_nix_cache_startup_file=/tmp/mnc-startup-"${BUILDKITE_JOB_ID}"
+
+nohup magic-nix-cache --listen "${MAGIC_NIX_CACHE_LISTEN}" \
+  --startup-notification-file "${magic_nix_cache_startup_file}" \
+  &> /tmp/mnc-"${BUILDKITE_JOB_ID}".log &
+(
+  echo "Waiting for Magic Nix Cache to start up"
+  started=0
+  for n in {1..30}; do
+    if [ -e "${magic_nix_cache_startup_file}" ]; then
+      echo "Magic Nix Cache daemon has successfully started up after ${n} attempt(s)"
+      started=1
+      break
+    else
+      echo "Waiting on Magic Nix Cache daemon; on attempt ${n}"
+      sleep 2
+    fi
+  done
+
+  if [[ "${started}" != "1" ]]; then
+    echo "The Magic Nix Cache daemon did not start up within 60 seconds; exiting"
+    exit 1
+  fi
+) || true

@@ -1,0 +1,9 @@
+#!/bin/bash
+set -euo pipefail
+
+export MAGIC_NIX_CACHE_LISTEN="127.0.0.1:37515"
+
+# Drain Magic Nix Cache
+curl -XPOST "http://${MAGIC_NIX_CACHE_LISTEN}/api/workflow-finish"
+
+echo "Store paths successfully pushed to FlakeHub Cache!"

@@ -1,0 +1,16 @@
+---
+
+name: FlakeHub Cache Buildkite Plugin
+description: >
+  Use FlakeHub Cache, zero-configuration binary cache for Nix.
+  See: https://flakehub.com/cache
+author: https://github.com/DeterminateSystems
+requirements:
+  - bash
+  - curl
+  - determinate-nixd
+  - magic-nix-cache
+configuration:
+  properties: {}
+  required: []
+  additionalProperties: false
