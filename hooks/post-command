@@ -3,7 +3,21 @@ set -euo pipefail
 
 export MAGIC_NIX_CACHE_LISTEN="127.0.0.1:37515"
 
-# Drain Magic Nix Cache
-curl -XPOST "http://${MAGIC_NIX_CACHE_LISTEN}/api/workflow-finish"
+upload_logs="${BUILDKITE_PLUGIN_FLAKEHUB_CACHE_UPLOAD_LOGS:-"true"}"
 
-echo "Store paths successfully pushed to FlakeHub Cache!"
+
+# Drain Magic Nix Cache
+rc=0
+curl -XPOST "http://${MAGIC_NIX_CACHE_LISTEN}/api/workflow-finish" > /dev/null || rc=$?
+
+if [[ $rc == 0 ]]; then
+  echo "Store paths successfully pushed to FlakeHub Cache!"
+fi
+
+if [[ $upload_logs == "true" ]]; then
+  buildkite-agent artifact upload "/tmp/mnc-${BUILDKITE_JOB_ID}.log"
+else
+  echo "Skipping log upload"
+fi
+
+exit $rc

@@ -16,4 +16,6 @@ steps:
 
 ## Configuration
 
-This plugin requires no configuration.
+### `upload-logs` (Optional, boolean)
+
+Whether or not to upload plugin logs (default `true`).
