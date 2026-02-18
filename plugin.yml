@@ -11,6 +11,9 @@ requirements:
   - determinate-nixd
   - magic-nix-cache
 configuration:
-  properties: {}
+  properties:
+    upload-logs:
+      type: boolean
+      default: true
   required: []
   additionalProperties: false

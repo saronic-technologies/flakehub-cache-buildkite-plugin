@@ -80,4 +80,4 @@ nohup magic-nix-cache --listen "${MAGIC_NIX_CACHE_LISTEN}" \
     echo "The Magic Nix Cache daemon did not start up within 60 seconds; exiting"
     exit 1
   fi
-) || true
+)
