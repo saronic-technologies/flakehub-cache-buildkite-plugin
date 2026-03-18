@@ -1,20 +1,59 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-export DETERMINATE_NIX_INSTALL_URL="https://install.determinate.systems/nix?ci=buildkite"
-export MAGIC_NIX_CACHE_CLOSURE_URL="https://install.determinate.systems/magic-nix-cache-closure/branch/main/X64-Linux?ci=buildkite"
+os="$(uname -s)"
+arch="$(uname -m)"
+
 export MAGIC_NIX_CACHE_LISTEN="127.0.0.1:37515"
 
-if ! determinate-nixd version &> /dev/null; then
+case "${os}" in
+  Linux)
+    export DETERMINATE_NIX_INSTALL_URL="https://install.determinate.systems/nix?ci=buildkite"
+    nix_profile_path="/root/.nix-profile/bin"
+
+    case "${arch}" in
+      x86_64)  closure_arch="X64-Linux" ;;
+      aarch64) closure_arch="ARM64-Linux" ;;
+      *) echo "Unsupported Linux architecture: ${arch}"; exit 1 ;;
+    esac
+
+    ;;
+  Darwin)
+    export DETERMINATE_NIX_INSTALL_URL="https://install.determinate.systems/determinate-pkg/stable/Universal"
+    nix_profile_path="/nix/var/nix/profiles/default/bin"
+
+    case "${arch}" in
+      x86_64) closure_arch="X64-macOS" ;;
+      arm64)  closure_arch="ARM64-macOS" ;;
+      *) echo "Unsupported macOS architecture: ${arch}"; exit 1 ;;
+    esac
+    ;;
+  *)
+    echo "Unsupported OS: ${os}"
+    exit 1
+    ;;
+esac
+
+export MAGIC_NIX_CACHE_CLOSURE_URL="https://github.com/DeterminateSystems/magic-nix-cache/releases/latest/download/magic-nix-cache-${closure_arch}"
+
+if ! determinate-nixd version &>/dev/null; then
   echo "Installing Determinate Nix"
 
-  curl --proto '=https' --tlsv1.2 -sSf -L "${DETERMINATE_NIX_INSTALL_URL}" | \
-    sh -s -- install linux \
-      --no-confirm \
-      --init none
+  case "${os}" in
+    Linux)
+      curl --proto '=https' --tlsv1.2 -sSf -L "${DETERMINATE_NIX_INSTALL_URL}" | \
+        sh -s -- install linux \
+          --no-confirm \
+          --init none
 
-  nohup /usr/local/bin/determinate-nixd daemon &
-  export NIX_REMOTE="daemon"
+      nohup /usr/local/bin/determinate-nixd daemon &
+      export NIX_REMOTE="daemon"
+      ;;
+    Darwin)
+      curl --proto '=https' --tlsv1.2 -sSf -L "${DETERMINATE_NIX_INSTALL_URL}" -o /tmp/Determinate.pkg
+      sudo installer -pkg /tmp/Determinate.pkg -target /
+      ;;
+  esac
 
   echo "Waiting for Determinate Nixd status"
 
@@ -27,8 +66,8 @@ else
   echo "Determinate Nix detected, skipping install"
 fi
 
-# Set PATH to include Nix-created directories and persist that environment variable in a file
-PATH="${PATH}:/root/.nix-profile/bin/"
+# Set PATH to include Nix-created directories
+PATH="${PATH}:${nix_profile_path}"
 
 echo "Fetching OIDC token for Buildkite"
 
@@ -48,7 +87,9 @@ echo "Logging in to FlakeHub using OIDC token"
 
 echo "${buildkite_oidc_token}" | determinate-nixd login token --token-file /dev/stdin
 
-if ! command -v magic-nix-cache > /dev/null; then
+echo "Login successful"
+
+if ! command -v magic-nix-cache &>/dev/null; then
   echo "Installing Magic Nix Cache"
 
   magic_nix_cache_closure="$(curl -L "${MAGIC_NIX_CACHE_CLOSURE_URL}" |
@@ -57,9 +98,13 @@ if ! command -v magic-nix-cache > /dev/null; then
     tail -n1 |
     head -n1
   )"
-  sudo ln -sf "${magic_nix_cache_closure}/bin/magic-nix-cache" /usr/bin/magic-nix-cache
+  PATH="${PATH}:/usr/local/bin"
+  sudo mkdir -p /usr/local/bin
+  sudo ln -sf "${magic_nix_cache_closure}/bin/magic-nix-cache" /usr/local/bin/magic-nix-cache
+
+  echo "Magic Nix Cache installed"
 else
-  echo "magic-nix-cache detected, skipping install"
+  echo "Magic Nix Cache detected, skipping install"
 fi
 
 magic_nix_cache_startup_file=/tmp/mnc-startup-"${BUILDKITE_JOB_ID}"
