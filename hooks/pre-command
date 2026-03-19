@@ -89,6 +89,9 @@ echo "${buildkite_oidc_token}" | determinate-nixd login token --token-file /dev/
 
 echo "Login successful"
 
+# Try to kill any lingering magic-nix-cache processes
+nix shell nixpkgs#toybox -c killall -- magic-nix-cache &> /dev/null || true
+
 if ! command -v magic-nix-cache &>/dev/null; then
   echo "Installing Magic Nix Cache"
 
