@@ -55,7 +55,7 @@ if ! determinate-nixd version &>/dev/null; then
       ;;
   esac
 
-  echo "Waiting for Determinate Nixd status"
+  echo "Waiting for Determinate Nixd status..."
 
   while ! determinate-nixd status &>/dev/null; do
     sleep 0.1;
@@ -95,7 +95,7 @@ nix shell nixpkgs#toybox -c killall -- magic-nix-cache &> /dev/null || true
 if ! command -v magic-nix-cache &>/dev/null; then
   echo "Installing Magic Nix Cache"
 
-  magic_nix_cache_closure="$(curl -L "${MAGIC_NIX_CACHE_CLOSURE_URL}" |
+  mnc_closure="$(curl -L "${MAGIC_NIX_CACHE_CLOSURE_URL}" |
     xz -d |
     sudo "$(which nix-store)" --import |
     tail -n1 |
@@ -103,23 +103,34 @@ if ! command -v magic-nix-cache &>/dev/null; then
   )"
   PATH="${PATH}:/usr/local/bin"
   sudo mkdir -p /usr/local/bin
-  sudo ln -sf "${magic_nix_cache_closure}/bin/magic-nix-cache" /usr/local/bin/magic-nix-cache
+  sudo ln -sf "${mnc_closure}/bin/magic-nix-cache" /usr/local/bin/magic-nix-cache
 
   echo "Magic Nix Cache installed"
 else
   echo "Magic Nix Cache detected, skipping install"
 fi
 
-magic_nix_cache_startup_file=/tmp/mnc-startup-"${BUILDKITE_JOB_ID}"
+mnc_log_file="/tmp/mnc-${BUILDKITE_JOB_ID}.log"
+mnc_startup_file=/tmp/mnc-startup-"${BUILDKITE_JOB_ID}"
 
-nohup magic-nix-cache --listen "${MAGIC_NIX_CACHE_LISTEN}" \
-  --startup-notification-file "${magic_nix_cache_startup_file}" \
-  &> /tmp/mnc-"${BUILDKITE_JOB_ID}".log &
+case "${os}" in
+  Linux)
+    nohup magic-nix-cache --listen "${MAGIC_NIX_CACHE_LISTEN}" \
+      --startup-notification-file "${mnc_startup_file}" \
+      &> "${mnc_log_file}" &
+    ;;
+  Darwin)
+    nix run nixpkgs#tmux -- new -d -s mnc \
+      "magic-nix-cache --listen ${MAGIC_NIX_CACHE_LISTEN} \
+        --startup-notification-file ${mnc_startup_file}" \
+      \; pipe-pane -t mnc "cat > ${mnc_log_file}"
+    ;;
+esac
 (
-  echo "Waiting for Magic Nix Cache to start up"
+  echo "Waiting for Magic Nix Cache to start up..."
   started=0
-  for n in {1..30}; do
-    if [ -e "${magic_nix_cache_startup_file}" ]; then
+  for n in {1..5}; do
+    if [ -e "${mnc_startup_file}" ]; then
       echo "Magic Nix Cache daemon has successfully started up after ${n} attempt(s)"
       started=1
       break
@@ -130,7 +141,7 @@ nohup magic-nix-cache --listen "${MAGIC_NIX_CACHE_LISTEN}" \
   done
 
   if [[ "${started}" != "1" ]]; then
-    echo "The Magic Nix Cache daemon did not start up within 60 seconds; exiting"
+    echo "The Magic Nix Cache daemon did not start up within 10 seconds; exiting"
     exit 1
   fi
 )
