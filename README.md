@@ -11,7 +11,7 @@ Add the following to your `pipeline.yml`:
 steps:
   - command: nix build .#my-package
     plugins:
-      - DeterminateSystems/flakehub-cache#v1.2.0
+      - saronic-technologies/flakehub-cache#v2.0.0
 ```
 
 ## Configuration
