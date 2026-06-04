@@ -1,7 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-export MAGIC_NIX_CACHE_LISTEN="127.0.0.1:37515"
+# Must match the per-agent port computed in pre-command (see there for why).
+_mnc_slot="$(printf '%s' "${BUILDKITE_AGENT_NAME:-}" | grep -oE '[0-9]+$' || true)"
+if [ -z "${_mnc_slot}" ]; then
+  _mnc_slot="$(printf '%s' "${BUILDKITE_AGENT_NAME:-default}" | cksum | cut -d' ' -f1)"
+fi
+export MAGIC_NIX_CACHE_LISTEN="127.0.0.1:$(( 37515 + _mnc_slot % 1000 ))"
 
 upload_logs="${BUILDKITE_PLUGIN_FLAKEHUB_CACHE_UPLOAD_LOGS:-"true"}"
 
@@ -12,12 +17,17 @@ curl -XPOST "http://${MAGIC_NIX_CACHE_LISTEN}/api/workflow-finish" > /dev/null |
 
 if [[ $rc == 0 ]]; then
   echo "Store paths successfully pushed to FlakeHub Cache!"
+else
+  # Draining the cache is a best-effort optimization, not a correctness step.
+  # A failed drain (e.g. the daemon was gone) must not red an otherwise-green
+  # build — that was the seaval exit-7 incident.
+  echo "WARNING: could not drain Magic Nix Cache (rc=${rc}); cache push skipped this run. Non-fatal." >&2
 fi
 
 if [[ $upload_logs == "true" ]]; then
-  buildkite-agent artifact upload "/tmp/mnc-${BUILDKITE_JOB_ID}.log"
+  buildkite-agent artifact upload "/tmp/mnc-${BUILDKITE_JOB_ID}.log" || true
 else
   echo "Skipping log upload"
 fi
 
-exit $rc
+exit 0

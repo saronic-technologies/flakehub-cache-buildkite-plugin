@@ -4,7 +4,17 @@ set -euo pipefail
 os="$(uname -s)"
 arch="$(uname -m)"
 
-export MAGIC_NIX_CACHE_LISTEN="127.0.0.1:37515"
+# Per-agent listen port. Upstream assumes one ephemeral runner per host (the
+# GitHub Actions model) and hard-codes a single port. On a shared host running
+# many concurrent buildkite agents (e.g. scalar-1..16 on one box) a single port
+# makes every agent's daemon collide, and the host-wide kill below would nuke
+# siblings. Derive a stable per-agent port so each agent gets its own daemon;
+# the same agent name is visible in both pre- and post-command hooks.
+_mnc_slot="$(printf '%s' "${BUILDKITE_AGENT_NAME:-}" | grep -oE '[0-9]+$' || true)"
+if [ -z "${_mnc_slot}" ]; then
+  _mnc_slot="$(printf '%s' "${BUILDKITE_AGENT_NAME:-default}" | cksum | cut -d' ' -f1)"
+fi
+export MAGIC_NIX_CACHE_LISTEN="127.0.0.1:$(( 37515 + _mnc_slot % 1000 ))"
 
 case "${os}" in
   Linux)
@@ -89,8 +99,10 @@ echo "${buildkite_oidc_token}" | determinate-nixd login token --token-file /dev/
 
 echo "Login successful"
 
-# Try to kill any lingering magic-nix-cache processes
-nix shell nixpkgs#toybox -c killall -s SIGKILL magic-nix-cache || true
+# Kill only a stale daemon on *our* port (e.g. a crashed prior build on this
+# same agent). Must NOT touch sibling agents' daemons bound to other ports, or
+# concurrent in-flight builds lose their cache and fail at post-command.
+nix shell nixpkgs#toybox -c pkill -SIGKILL -f "magic-nix-cache --listen ${MAGIC_NIX_CACHE_LISTEN}" || true
 
 if ! command -v magic-nix-cache &>/dev/null; then
   echo "Installing Magic Nix Cache"
