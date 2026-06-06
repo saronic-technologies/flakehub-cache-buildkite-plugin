@@ -69,23 +69,13 @@ fi
 # Set PATH to include Nix-created directories
 PATH="${PATH}:${nix_profile_path}"
 
-echo "Fetching OIDC token for Buildkite"
-
-token_lifetime="${BUILDKITE_PLUGIN_FLAKEHUB_CACHE_TOKEN_LIFETIME_SECONDS:-3600}"
-
-echo "Token lifetime set to ${token_lifetime} seconds"
-
-buildkite_oidc_token="$(\
-  buildkite-agent oidc request-token \
-  --claim 'organization_id' \
-  --claim 'pipeline_id' \
-  --audience "api.flakehub.com" \
-  --lifetime "${token_lifetime}" \
-)"
-
 echo "Logging in to FlakeHub using OIDC token"
 
-echo "${buildkite_oidc_token}" | determinate-nixd login token --token-file /dev/stdin
+# NOTE: this login command only exists on Determinate Nix v3.21.0 and later
+if ! determinate-nixd auth login buildkite; then
+  echo "Auth initially failed, trying one more time..."
+  determinate-nixd auth login buildkite
+fi
 
 echo "Login successful"
 
