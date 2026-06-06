@@ -69,7 +69,7 @@ fi
 # Set PATH to include Nix-created directories
 PATH="${PATH}:${nix_profile_path}"
 
-echo "Logging in to FlakeHub using OIDC token"
+echo "Logging in to FlakeHub using Buildkite auth method"
 
 # NOTE: this login command only exists on Determinate Nix v3.21.0 and later
 if ! determinate-nixd auth login buildkite; then
