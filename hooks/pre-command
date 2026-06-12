@@ -34,7 +34,7 @@ case "${os}" in
     ;;
 esac
 
-export MAGIC_NIX_CACHE_CLOSURE_URL="https://github.com/DeterminateSystems/magic-nix-cache/releases/latest/download/magic-nix-cache-${closure_arch}"
+export MAGIC_NIX_CACHE_CLOSURE_URL="https://install.determinate.systems/magic-nix-cache-closure/stable/${closure_arch}"
 
 if ! determinate-nixd version &>/dev/null; then
   echo "Installing Determinate Nix"
