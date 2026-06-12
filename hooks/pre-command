@@ -6,6 +6,8 @@ arch="$(uname -m)"
 
 export MAGIC_NIX_CACHE_LISTEN="127.0.0.1:37515"
 
+export RUNNER_DEBUG=1
+
 case "${os}" in
   Linux)
     export DETERMINATE_NIX_INSTALL_URL="https://install.determinate.systems/nix?ci=buildkite"
@@ -105,12 +107,12 @@ mnc_startup_file=/tmp/mnc-startup-"${BUILDKITE_JOB_ID}"
 
 case "${os}" in
   Linux)
-    nohup magic-nix-cache --listen "${MAGIC_NIX_CACHE_LISTEN}" \
+    RUNNER_DEBUG=1 nohup magic-nix-cache --listen "${MAGIC_NIX_CACHE_LISTEN}" \
       --startup-notification-file "${mnc_startup_file}" \
       &> "${mnc_log_file}" &
     ;;
   Darwin)
-    nix run nixpkgs#tmux -- new -d -s mnc \
+    RUNNER_DEBUG=1 nix run nixpkgs#tmux -- new -d -s mnc \
       "magic-nix-cache --listen ${MAGIC_NIX_CACHE_LISTEN} \
         --startup-notification-file ${mnc_startup_file}" \
       \; pipe-pane -t mnc "cat > ${mnc_log_file}"
