@@ -36,7 +36,8 @@ case "${os}" in
     ;;
 esac
 
-export MAGIC_NIX_CACHE_CLOSURE_URL="https://install.determinate.systems/magic-nix-cache-closure/stable/${closure_arch}"
+#export MAGIC_NIX_CACHE_CLOSURE_URL="https://install.determinate.systems/magic-nix-cache-closure/stable/${closure_arch}"
+export MAGIC_NIX_CACHE_CLOSURE_URL="https://install.determinate.systems/magic-nix-cache/pr/190/${closure_arch}"
 
 if ! determinate-nixd version &>/dev/null; then
   echo "Installing Determinate Nix"
@@ -84,36 +85,36 @@ echo "Login successful"
 # Try to kill any lingering magic-nix-cache processes
 nix shell nixpkgs#toybox -c killall -s SIGKILL magic-nix-cache || true
 
-if ! command -v magic-nix-cache &>/dev/null; then
-  echo "Installing Magic Nix Cache"
+# if ! command -v magic-nix-cache &>/dev/null; then
+echo "Installing Magic Nix Cache"
 
-  mnc_closure="$(curl -L "${MAGIC_NIX_CACHE_CLOSURE_URL}" |
-    xz -d |
-    sudo "$(which nix-store)" --import |
-    tail -n1 |
-    head -n1
-  )"
-  PATH="${PATH}:/usr/local/bin"
-  sudo mkdir -p /usr/local/bin
-  sudo ln -sf "${mnc_closure}/bin/magic-nix-cache" /usr/local/bin/magic-nix-cache
+mnc_closure="$(curl -L "${MAGIC_NIX_CACHE_CLOSURE_URL}" |
+  xz -d |
+  sudo "$(which nix-store)" --import |
+  tail -n1 |
+  head -n1
+)"
+# PATH="${PATH}:/usr/local/bin"
+# sudo mkdir -p /usr/local/bin
+# sudo ln -sf "${mnc_closure}/bin/magic-nix-cache" /usr/local/bin/magic-nix-cache
 
-  echo "Magic Nix Cache installed"
-else
-  echo "Magic Nix Cache detected, skipping install"
-fi
+echo "Magic Nix Cache installed"
+# else
+#   echo "Magic Nix Cache detected, skipping install"
+# fi
 
 mnc_log_file="/tmp/mnc-${BUILDKITE_JOB_ID}.log"
 mnc_startup_file=/tmp/mnc-startup-"${BUILDKITE_JOB_ID}"
 
 case "${os}" in
   Linux)
-    RUNNER_DEBUG=1 nohup magic-nix-cache --listen "${MAGIC_NIX_CACHE_LISTEN}" \
+    RUNNER_DEBUG=1 nohup "${mnc_closure}/bin/magic-nix-cache" --debug --listen "${MAGIC_NIX_CACHE_LISTEN}" \
       --startup-notification-file "${mnc_startup_file}" \
       &> "${mnc_log_file}" &
     ;;
   Darwin)
     RUNNER_DEBUG=1 nix run nixpkgs#tmux -- new -d -s mnc \
-      "magic-nix-cache --listen ${MAGIC_NIX_CACHE_LISTEN} \
+      "${mnc_closure}/bin/magic-nix-cache --debug --listen ${MAGIC_NIX_CACHE_LISTEN} \
         --startup-notification-file ${mnc_startup_file}" \
       \; pipe-pane -t mnc "cat > ${mnc_log_file}"
     ;;
