@@ -16,7 +16,7 @@ fi
 
 if [[ $upload_logs == "true" ]]; then
   buildkite-agent artifact upload "/tmp/mnc-${BUILDKITE_JOB_ID}.log"
-  buildkite-agent artifact upload "$TMPDIR/magic-nix-cache-tracing.log"
+  buildkite-agent artifact upload "/tmp/magic-nix-cache-tracing.log"
 else
   echo "Skipping log upload"
 fi
