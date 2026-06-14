@@ -108,12 +108,12 @@ mnc_startup_file=/tmp/mnc-startup-"${BUILDKITE_JOB_ID}"
 
 case "${os}" in
   Linux)
-    RUNNER_DEBUG=1 nohup "${mnc_closure}/bin/magic-nix-cache" --debug --listen "${MAGIC_NIX_CACHE_LISTEN}" \
+    RUST_LOG=debug RUNNER_DEBUG=1 nohup "${mnc_closure}/bin/magic-nix-cache" --debug --listen "${MAGIC_NIX_CACHE_LISTEN}" \
       --startup-notification-file "${mnc_startup_file}" \
       &> "${mnc_log_file}" &
     ;;
   Darwin)
-    RUNNER_DEBUG=1 nix run nixpkgs#tmux -- new -d -s mnc \
+    RUST_LOG=debug RUNNER_DEBUG=1 nix run nixpkgs#tmux -- new -d -s mnc \
       "${mnc_closure}/bin/magic-nix-cache --debug --listen ${MAGIC_NIX_CACHE_LISTEN} \
         --startup-notification-file ${mnc_startup_file}" \
       \; pipe-pane -t mnc "cat > ${mnc_log_file}"
