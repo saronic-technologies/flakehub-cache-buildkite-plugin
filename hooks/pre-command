@@ -135,3 +135,12 @@ esac
     exit 1
   fi
 )
+
+# Clean stale Nix binary cache databases between jobs to prevent NAR cache path interference.
+# Best-effort: skip missing caches, warn (but don't fail) if a file can't be removed.
+for cache_dir in "${HOME}/.cache/nix" /root/.cache/nix; do
+  [ -d "${cache_dir}" ] || continue
+  find "${cache_dir}" -maxdepth 1 -name 'binary-cache-*.sqlite' \
+    -print -delete | sed 's/^/Removed Nix binary cache file: /' \
+    || echo "Warning: could not clean some Nix binary cache files in ${cache_dir}"
+done
