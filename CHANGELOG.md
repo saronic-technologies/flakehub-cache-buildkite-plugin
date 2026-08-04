@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) and to [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/).
 
+## v3.3.0 (2026-08-04)
+
+### Feature
+- add `push` option (default `true`): when `false`, never start Magic Nix Cache (multi-agent-safe, login-only mode)
+- keep the FlakeHub login fresh for the whole job via a deadline-driven background refresher (renews off the token's own `iat`/`exp`; fails loudly on undecodable tokens)
+
 ## v2.0.0 (2026-03-20)
 
 ### Feature

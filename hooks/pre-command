@@ -69,15 +69,35 @@ fi
 # Set PATH to include Nix-created directories
 PATH="${PATH}:${nix_profile_path}"
 
-echo "Logging in to FlakeHub using Buildkite auth method"
+plugin_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# shellcheck source=lib/auth.sh
+source "${plugin_dir}/lib/auth.sh"
 
-# NOTE: this login command only exists on Determinate Nix v3.21.0 and later
-if ! determinate-nixd auth login buildkite; then
-  echo "Auth initially failed, trying one more time..."
-  determinate-nixd auth login buildkite
+push_enabled="${BUILDKITE_PLUGIN_FLAKEHUB_CACHE_PUSH:-true}"
+
+# NOTE: the login command only exists on Determinate Nix v3.21.0 and later.
+# Skip when the host-wide token is still fresh (a concurrent job on a
+# multi-agent host may have just minted one).
+if login_needed; then
+  echo "Logging in to FlakeHub using Buildkite auth method"
+  flakehub_login
+  echo "Login successful"
+else
+  echo "FlakeHub token still fresh; skipping login"
 fi
 
-echo "Login successful"
+# OIDC-minted FlakeHub sessions are short-lived, so keep the login fresh for
+# the whole job. The refresher renews only when the token nears expiry or the
+# cache rejects it; pre-exit tears it down.
+refresher_log="/tmp/flakehub-refresher-${BUILDKITE_JOB_ID}.log"
+refresher_pidfile="/tmp/flakehub-refresher-${BUILDKITE_JOB_ID}.pid"
+nohup bash "${plugin_dir}/lib/refresher.sh" "$PPID" &> "${refresher_log}" &
+echo $! > "${refresher_pidfile}"
+disown
+
+if [[ "${push_enabled}" != "true" ]]; then
+  echo "push disabled; not starting Magic Nix Cache (login-only mode)"
+else
 
 # Try to kill any lingering magic-nix-cache processes
 nix shell nixpkgs#toybox -c killall -s SIGKILL magic-nix-cache || true
@@ -135,6 +155,8 @@ esac
     exit 1
   fi
 )
+
+fi # push_enabled
 
 # Clean stale Nix binary cache databases between jobs to prevent NAR cache path interference.
 # Best-effort: skip missing caches, warn (but don't fail) if a file can't be removed.
