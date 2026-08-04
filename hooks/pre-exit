@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+# Tear down the login keepalive (runs on success, failure, and cancellation).
+set -euo pipefail
+
+upload_logs="${BUILDKITE_PLUGIN_FLAKEHUB_CACHE_UPLOAD_LOGS:-"true"}"
+pidfile="/tmp/flakehub-refresher-${BUILDKITE_JOB_ID}.pid"
+logfile="/tmp/flakehub-refresher-${BUILDKITE_JOB_ID}.log"
+
+if [ -f "${pidfile}" ]; then
+  kill "$(cat "${pidfile}")" 2>/dev/null || true
+  rm -f "${pidfile}"
+fi
+
+if [[ "${upload_logs}" == "true" && -f "${logfile}" ]]; then
+  buildkite-agent artifact upload "${logfile}" || true
+fi

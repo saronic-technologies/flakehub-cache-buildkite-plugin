@@ -16,5 +16,13 @@ configuration:
       description: Whether or not to upload plugin logs to the Buildkite job (default `true`).
       type: boolean
       default: true
+    push:
+      description: >
+        Whether to push store paths built by the job to FlakeHub Cache (default `true`).
+        When `false`, Magic Nix Cache is never started — safe on hosts running multiple
+        concurrent agents — and the plugin only maintains FlakeHub authentication
+        (cache reads and private flakes) for the duration of the job.
+      type: boolean
+      default: true
   required: []
   additionalProperties: false

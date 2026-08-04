@@ -4,7 +4,12 @@ set -euo pipefail
 export MAGIC_NIX_CACHE_LISTEN="127.0.0.1:37515"
 
 upload_logs="${BUILDKITE_PLUGIN_FLAKEHUB_CACHE_UPLOAD_LOGS:-"true"}"
+push_enabled="${BUILDKITE_PLUGIN_FLAKEHUB_CACHE_PUSH:-true}"
 
+if [[ "${push_enabled}" != "true" ]]; then
+  echo "push disabled; no Magic Nix Cache to drain"
+  exit 0
+fi
 
 # Drain Magic Nix Cache
 rc=0
