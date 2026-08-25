@@ -57,13 +57,21 @@ login_needed() {
   return 1
 }
 
-# Log in via this job's Buildkite OIDC identity. Fails if the resulting netrc
-# token is not a decodable JWT.
+# Log in via this job's Buildkite OIDC identity. Retries with backoff (~30s
+# total) so a brief FlakeHub or OIDC blip degrades to a slower job rather than
+# a failed one. Fails if the resulting netrc token is not a decodable JWT.
 flakehub_login() {
-  if ! determinate-nixd auth login buildkite; then
-    echo "FlakeHub login failed, trying one more time..."
-    determinate-nixd auth login buildkite
-  fi
+  local attempt delay=2
+  for attempt in 1 2 3 4 5; do
+    determinate-nixd auth login buildkite && break
+    if [ "$attempt" -eq 5 ]; then
+      echo "FlakeHub login failed after ${attempt} attempts" >&2
+      return 1
+    fi
+    echo "FlakeHub login failed (attempt ${attempt}); retrying in ${delay}s..."
+    sleep "$delay"
+    delay=$(( delay * 2 ))
+  done
   token_times >/dev/null || {
     echo "FATAL: netrc token after login is not a decodable JWT; refusing to continue" >&2
     return 1

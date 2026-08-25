@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) and to [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/).
 
+## v3.3.1 (2026-08-25)
+
+### Bug Fixes
+- retry the FlakeHub login with exponential backoff (5 attempts over ~30s) instead of one instant retry, so short FlakeHub/OIDC outages no longer fail jobs (motivated by the 2026-08-25 14:46–15:41 UTC auth outage)
+
 ## v3.3.0 (2026-08-04)
 
 ### Feature
