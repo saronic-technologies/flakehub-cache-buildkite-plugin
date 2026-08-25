@@ -6,9 +6,23 @@ arch="$(uname -m)"
 
 export MAGIC_NIX_CACHE_LISTEN="127.0.0.1:37515"
 
+# Determinate Nix version installed on hosts that don't already have one.
+# NixOS agents bake determinate-nixd into the image via the determinate flake
+# input and never hit the install path; this pin covers hosted macs and other
+# non-NixOS agents. The default is bumped with each plugin release so
+# consumers get the version the release was validated against; set the
+# `determinate-nix-version` option to override, or `stable` to track
+# Determinate's rolling channel.
+default_determinate_nix_version="3.22.2"
+determinate_nix_version="${BUILDKITE_PLUGIN_FLAKEHUB_CACHE_DETERMINATE_NIX_VERSION:-${default_determinate_nix_version}}"
+
 case "${os}" in
   Linux)
-    export DETERMINATE_NIX_INSTALL_URL="https://install.determinate.systems/nix?ci=buildkite"
+    if [ "${determinate_nix_version}" = "stable" ]; then
+      export DETERMINATE_NIX_INSTALL_URL="https://install.determinate.systems/nix?ci=buildkite"
+    else
+      export DETERMINATE_NIX_INSTALL_URL="https://install.determinate.systems/nix/tag/v${determinate_nix_version}?ci=buildkite"
+    fi
     nix_profile_path="/root/.nix-profile/bin"
 
     case "${arch}" in
@@ -19,7 +33,11 @@ case "${os}" in
 
     ;;
   Darwin)
-    export DETERMINATE_NIX_INSTALL_URL="https://install.determinate.systems/determinate-pkg/stable/Universal"
+    if [ "${determinate_nix_version}" = "stable" ]; then
+      export DETERMINATE_NIX_INSTALL_URL="https://install.determinate.systems/determinate-pkg/stable/Universal"
+    else
+      export DETERMINATE_NIX_INSTALL_URL="https://install.determinate.systems/determinate-pkg/tag/v${determinate_nix_version}/Universal"
+    fi
     nix_profile_path="/nix/var/nix/profiles/default/bin"
 
     case "${arch}" in
@@ -34,11 +52,11 @@ case "${os}" in
     ;;
 esac
 
+# The magic-nix-cache closure endpoint only serves the stable channel (no
+# version tags exist), and the project is frozen upstream at 0.1.572.
 export MAGIC_NIX_CACHE_CLOSURE_URL="https://install.determinate.systems/magic-nix-cache-closure/stable/${closure_arch}"
 
-if ! determinate-nixd version &>/dev/null; then
-  echo "Installing Determinate Nix"
-
+install_determinate_nix() {
   case "${os}" in
     Linux)
       curl --proto '=https' --tlsv1.2 -sSf -L "${DETERMINATE_NIX_INSTALL_URL}" | \
@@ -60,10 +78,25 @@ if ! determinate-nixd version &>/dev/null; then
   while ! determinate-nixd status &>/dev/null; do
     sleep 0.1;
   done
+}
 
+detected_version="$(determinate-nixd version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || true)"
+
+if [ -z "${detected_version}" ]; then
+  echo "Installing Determinate Nix ${determinate_nix_version}"
+  install_determinate_nix
   echo "Determinate Nix installed"
+elif [ "${determinate_nix_version}" = "stable" ] || [ "${detected_version}" = "${determinate_nix_version}" ]; then
+  echo "Determinate Nix ${detected_version} detected, skipping install"
+elif [ "${os}" = "Darwin" ]; then
+  # The macOS pkg upgrades in place; converge the host to the pin.
+  echo "Determinate Nix ${detected_version} detected but plugin pins ${determinate_nix_version}; installing pinned version"
+  install_determinate_nix
+  echo "Determinate Nix ${determinate_nix_version} installed"
 else
-  echo "Determinate Nix detected, skipping install"
+  # NixOS hosts pin their own version via the determinate flake input, and
+  # the Linux nix-installer has no in-place upgrade path — informational only.
+  echo "Determinate Nix ${detected_version} detected (plugin pins ${determinate_nix_version}); version is host-managed here, continuing"
 fi
 
 # Set PATH to include Nix-created directories
