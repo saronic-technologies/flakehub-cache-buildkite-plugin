@@ -12,6 +12,14 @@ requirements:
   - magic-nix-cache
 configuration:
   properties:
+    determinate-nix-version:
+      description: >
+        Determinate Nix version to install on hosts that don't already have one
+        (hosted macs and other non-NixOS agents; NixOS agents manage their own
+        version via the determinate flake input). Defaults to the version pinned
+        by this plugin release. Set to a version like `3.22.2`, or `stable` to
+        track Determinate's rolling channel.
+      type: string
     upload-logs:
       description: Whether or not to upload plugin logs to the Buildkite job (default `true`).
       type: boolean

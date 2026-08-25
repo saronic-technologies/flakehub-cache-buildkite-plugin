@@ -16,6 +16,32 @@ steps:
 
 ## Configuration
 
+### `determinate-nix-version` (Optional, string)
+
+The Determinate Nix version installed on hosts that don't already have one —
+hosted macs and other non-NixOS agents. NixOS agents bake `determinate-nixd`
+into their image via the `determinate` flake input and never hit the install
+path.
+
+Defaults to the version pinned by this plugin release, so the version an agent
+gets rides the plugin tag your pipeline already pins: bumping Determinate Nix
+for these hosts is a one-line change to the default here, a new plugin release,
+and a tag bump in the pipeline — and rolling back is reverting the tag. Set to
+a specific version like `3.22.2` to override, or `stable` to track
+Determinate's rolling channel (the pre-v3.4.0 behavior).
+
+On macOS a host with a different version than the pin is converged by
+reinstalling the pinned package. On Linux and NixOS the installed version is
+host-managed; a mismatch is logged but not changed.
+
+```yml
+steps:
+  - command: nix build .#my-package
+    plugins:
+      - saronic-technologies/flakehub-cache#v3.4.0:
+          determinate-nix-version: stable
+```
+
 ### `upload-logs` (Optional, boolean)
 
 Whether or not to upload plugin logs to the Buildkite job (default `true`).

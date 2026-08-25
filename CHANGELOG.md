@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) and to [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/).
 
+## v3.4.0 (2026-08-25)
+
+### Feature
+- pin the Determinate Nix version installed on non-NixOS hosts (default per plugin release, currently `3.22.2`) via version-tagged install URLs, replacing the unpinned `stable` channel; add `determinate-nix-version` option to override or opt back into `stable`
+- log the detected Determinate Nix version; on macOS, converge hosts whose version differs from the pin by reinstalling the pinned package
+
 ## v3.3.1 (2026-08-25)
 
 ### Bug Fixes
