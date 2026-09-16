@@ -109,15 +109,16 @@ source "${plugin_dir}/lib/auth.sh"
 push_enabled="${BUILDKITE_PLUGIN_FLAKEHUB_CACHE_PUSH:-true}"
 
 # NOTE: the login command only exists on Determinate Nix v3.21.0 and later.
-# Skip when the host-wide token is still fresh (a concurrent job on a
-# multi-agent host may have just minted one).
-if login_needed; then
-  echo "Logging in to FlakeHub using Buildkite auth method"
-  flakehub_login
-  echo "Login successful"
-else
-  echo "FlakeHub token still fresh; skipping login"
-fi
+# Always log in with this job's Buildkite OIDC identity, even when the netrc
+# already holds a token that looks usable. A pre-existing token can pass
+# freshness and cache probes yet still be rejected by Magic Nix Cache's
+# api.flakehub.com cache-name lookup: a host's boot-time awssts token has
+# cache-read entitlement but no FlakeHub org session (combined-pr-checks-slurm
+# build 99, 2026-09-16). A working session is established, never inferred; the
+# ~1.5s login cost is noise against any real job.
+echo "Logging in to FlakeHub using Buildkite auth method"
+flakehub_login
+echo "Login successful"
 
 # OIDC-minted FlakeHub sessions are short-lived, so keep the login fresh for
 # the whole job. The refresher renews only when the token nears expiry or the

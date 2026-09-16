@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) and to [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/).
 
+## v3.5.0 (2026-09-16)
+
+### Bug Fixes
+- always log in with the job's Buildkite OIDC identity instead of skipping when the host netrc token looks fresh: a boot-time awssts token passes the freshness and cache.flakehub.com probes (it has cache-read entitlement) but has no FlakeHub org session, so Magic Nix Cache's api.flakehub.com cache-name lookup gets 401 and the daemon never starts (60s startup timeouts across bk-runners-slurm fan-out waves, combined-pr-checks-slurm build 99). The mid-job refresher keeps its deadline-driven renewal logic unchanged.
+
 ## v3.4.0 (2026-08-25)
 
 ### Feature
