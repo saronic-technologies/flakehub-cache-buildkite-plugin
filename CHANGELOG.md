@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) and to [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/).
 
+## v3.6.0 (2026-09-18)
+
+### Bug Fixes
+- upload nsh whole-graph build outputs to FlakeHub Cache: `--store nsh://` builds run on the cluster and their outputs come back as a store copy, which emits no determinate-nixd built-path events, so magic-nix-cache's upload set was always empty ("FlakeHub Cache uploads completed, paths: []"). post-command now enqueues the closures of the store symlinks the job left in the checkout via mnc's /api/enqueue-paths before draining. Locally-built paths are unaffected (already event-enqueued; duplicates dedup against the cache). Steps that leave no out-links (`nix run`-only) still upload nothing.
+
 ## v3.5.0 (2026-09-16)
 
 ### Bug Fixes

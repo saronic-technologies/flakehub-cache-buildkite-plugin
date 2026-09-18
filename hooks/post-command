@@ -11,6 +11,23 @@ if [[ "${push_enabled}" != "true" ]]; then
   exit 0
 fi
 
+# nsh whole-graph builds (`--store nsh://`) copy their outputs back into the
+# local store instead of building them here, so determinate-nixd emits no
+# built-path events and mnc's upload set stays empty ("paths: []").
+# Enqueue the closures of the store symlinks the job left in the checkout
+# (result*, --out-link targets, -o files) before draining.
+mapfile -t out_links < <(find "${BUILDKITE_BUILD_CHECKOUT_PATH:-$PWD}" \
+  -maxdepth 3 -type l -lname '/nix/store/*' 2>/dev/null | head -64)
+if (( ${#out_links[@]} > 0 )); then
+  if paths_json="$(nix path-info --recursive "${out_links[@]}" 2>/dev/null \
+      | jq --raw-input . | jq --slurp --compact-output '{store_paths: .}')"; then
+    echo "Enqueueing $(jq '.store_paths | length' <<<"$paths_json") store paths from ${#out_links[@]} out-link(s)"
+    curl -s -X POST -H 'Content-Type: application/json' \
+      -d "$paths_json" "http://${MAGIC_NIX_CACHE_LISTEN}/api/enqueue-paths" > /dev/null \
+      || echo "WARNING: enqueue-paths failed; FlakeHub upload set may be incomplete"
+  fi
+fi
+
 # Drain Magic Nix Cache
 rc=0
 curl -XPOST "http://${MAGIC_NIX_CACHE_LISTEN}/api/workflow-finish" > /dev/null || rc=$?
