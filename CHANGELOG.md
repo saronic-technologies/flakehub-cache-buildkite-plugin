@@ -7,7 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ## v3.6.0 (2026-09-18)
 
 ### Bug Fixes
-- upload nsh whole-graph build outputs to FlakeHub Cache: `--store nsh://` builds run on the cluster and their outputs come back as a store copy, which emits no determinate-nixd built-path events, so magic-nix-cache's upload set was always empty ("FlakeHub Cache uploads completed, paths: []"). post-command now enqueues the closures of the store symlinks the job left in the checkout via mnc's /api/enqueue-paths before draining. Locally-built paths are unaffected (already event-enqueued; duplicates dedup against the cache). Steps that leave no out-links (`nix run`-only) still upload nothing.
+- **TEMPORARY WORKAROUND** (remediation: Determinate Systems to provide a first-class way to push to the FlakeHub cache ourselves — a supported push CLI/API — instead of magic-nix-cache's daemon-event side channel; remove this hook logic when that lands): upload nsh whole-graph build outputs to FlakeHub Cache: `--store nsh://` builds run on the cluster and their outputs come back as a store copy, which emits no determinate-nixd built-path events, so magic-nix-cache's upload set was always empty ("FlakeHub Cache uploads completed, paths: []"). post-command now enqueues the closures of the store symlinks the job left in the checkout via mnc's /api/enqueue-paths before draining. Locally-built paths are unaffected (already event-enqueued; duplicates dedup against the cache). Steps that leave no out-links (`nix run`-only) still upload nothing.
 
 ## v3.5.0 (2026-09-16)
 

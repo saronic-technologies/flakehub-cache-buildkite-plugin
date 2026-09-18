@@ -11,11 +11,17 @@ if [[ "${push_enabled}" != "true" ]]; then
   exit 0
 fi
 
+# TEMPORARY WORKAROUND — remove when Determinate Systems gives us a
+# first-class way to push to the FlakeHub cache ourselves (a supported push
+# CLI/API instead of magic-nix-cache's daemon-event side channel).
+#
 # nsh whole-graph builds (`--store nsh://`) copy their outputs back into the
 # local store instead of building them here, so determinate-nixd emits no
 # built-path events and mnc's upload set stays empty ("paths: []").
-# Enqueue the closures of the store symlinks the job left in the checkout
-# (result*, --out-link targets, -o files) before draining.
+# Until then, enqueue the closures of the store symlinks the job left in
+# the checkout (result*, --out-link targets, -o files) before draining.
+# Known gaps of this approach: `nix run`-only steps leave no links and
+# upload nothing; the out-link scan is heuristic (maxdepth 3, first 64).
 mapfile -t out_links < <(find "${BUILDKITE_BUILD_CHECKOUT_PATH:-$PWD}" \
   -maxdepth 3 -type l -lname '/nix/store/*' 2>/dev/null | head -64)
 if (( ${#out_links[@]} > 0 )); then
