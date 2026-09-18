@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) and to [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/).
 
+## v3.6.2 (2026-09-18)
+
+### Bug Fixes
+- the v3.6.1 enqueue POST failed for real workloads: the JSON payload was passed as one curl argument and thousands of paths overflow Linux's 128 KiB per-argument exec limit (musv shadow build 38: "Enqueueing 9132 store paths" then the WARNING). The payload now travels by file (`-d @file`), and curl uses -f so HTTP errors surface too.
+
 ## v3.6.1 (2026-09-18)
 
 ### Bug Fixes

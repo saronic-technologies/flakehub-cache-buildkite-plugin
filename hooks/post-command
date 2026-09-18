@@ -26,17 +26,22 @@ fi
 if [[ "${BUILDKITE_COMMAND:-}" == *"nsh://"* ]] \
     && [[ -r "/tmp/fhc-cmd-start-${BUILDKITE_JOB_ID}" ]]; then
   cmd_start="$(cat "/tmp/fhc-cmd-start-${BUILDKITE_JOB_ID}")"
-  if paths_json="$(nix path-info --all --json 2>/dev/null \
+  # The payload travels by file: thousands of paths overflow the 128 KiB
+  # per-argument exec limit if passed inline.
+  payload="/tmp/fhc-enqueue-${BUILDKITE_JOB_ID}.json"
+  if nix path-info --all --json 2>/dev/null \
       | jq --compact-output --argjson t "$cmd_start" \
-          'to_entries | map(select((.value.registrationTime // 0) >= $t) | .key) | {store_paths: .}')"; then
-    n="$(jq '.store_paths | length' <<<"$paths_json")"
+          'to_entries | map(select((.value.registrationTime // 0) >= $t) | .key) | {store_paths: .}' \
+          > "$payload"; then
+    n="$(jq '.store_paths | length' "$payload")"
     if (( n > 0 )); then
       echo "Enqueueing ${n} store paths registered since the command started (nsh build outputs)"
-      curl -s -X POST -H 'Content-Type: application/json' \
-        -d "$paths_json" "http://${MAGIC_NIX_CACHE_LISTEN}/api/enqueue-paths" > /dev/null \
-        || echo "WARNING: enqueue-paths failed; FlakeHub upload set may be incomplete"
+      curl -sf -X POST -H 'Content-Type: application/json' \
+        -d @"$payload" "http://${MAGIC_NIX_CACHE_LISTEN}/api/enqueue-paths" > /dev/null \
+        || echo "WARNING: enqueue-paths failed (HTTP or transport); FlakeHub upload set may be incomplete"
     fi
   fi
+  rm -f "$payload"
 fi
 rm -f "/tmp/fhc-cmd-start-${BUILDKITE_JOB_ID}"
 
