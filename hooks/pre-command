@@ -200,3 +200,8 @@ for cache_dir in "${HOME}/.cache/nix" /root/.cache/nix; do
     -print -delete | sed 's/^/Removed Nix binary cache file: /' \
     || echo "Warning: could not clean some Nix binary cache files in ${cache_dir}"
 done
+
+# Store-registration watermark for post-command's nsh output enqueue (see the
+# TEMPORARY WORKAROUND there): everything registered after this instant is a
+# candidate upload for jobs that build via `--store nsh://`.
+date +%s > "/tmp/fhc-cmd-start-${BUILDKITE_JOB_ID}"

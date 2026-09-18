@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) and to [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/).
 
+## v3.6.1 (2026-09-18)
+
+### Bug Fixes
+- the v3.6.0 out-link scan never matched for nsh jobs: `nix build --store nsh://` creates no ./result out-links (out-links are local-FS-store only), so nothing was enqueued. Discovery now uses the store itself: pre-command writes a watermark, post-command enqueues every path whose registrationTime is after it — gated on the command containing `nsh://` so ordinary jobs skip the store scan. Still a TEMPORARY WORKAROUND pending first-class FlakeHub cache push access from Determinate Systems.
+
 ## v3.6.0 (2026-09-18)
 
 ### Bug Fixes

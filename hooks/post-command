@@ -17,22 +17,28 @@ fi
 #
 # nsh whole-graph builds (`--store nsh://`) copy their outputs back into the
 # local store instead of building them here, so determinate-nixd emits no
-# built-path events and mnc's upload set stays empty ("paths: []").
-# Until then, enqueue the closures of the store symlinks the job left in
-# the checkout (result*, --out-link targets, -o files) before draining.
-# Known gaps of this approach: `nix run`-only steps leave no links and
-# upload nothing; the out-link scan is heuristic (maxdepth 3, first 64).
-mapfile -t out_links < <(find "${BUILDKITE_BUILD_CHECKOUT_PATH:-$PWD}" \
-  -maxdepth 3 -type l -lname '/nix/store/*' 2>/dev/null | head -64)
-if (( ${#out_links[@]} > 0 )); then
-  if paths_json="$(nix path-info --recursive "${out_links[@]}" 2>/dev/null \
-      | jq --raw-input . | jq --slurp --compact-output '{store_paths: .}')"; then
-    echo "Enqueueing $(jq '.store_paths | length' <<<"$paths_json") store paths from ${#out_links[@]} out-link(s)"
-    curl -s -X POST -H 'Content-Type: application/json' \
-      -d "$paths_json" "http://${MAGIC_NIX_CACHE_LISTEN}/api/enqueue-paths" > /dev/null \
-      || echo "WARNING: enqueue-paths failed; FlakeHub upload set may be incomplete"
+# built-path events and mnc's upload set stays empty ("paths: []"). Nor do
+# such builds leave ./result out-links (out-links are only created for
+# local-FS stores), so the store itself is the only record: enqueue every
+# path registered in the local store since the job's command started.
+# Gated on the command actually using nsh, so ordinary jobs (whose builds
+# are already event-enqueued) skip the store scan.
+if [[ "${BUILDKITE_COMMAND:-}" == *"nsh://"* ]] \
+    && [[ -r "/tmp/fhc-cmd-start-${BUILDKITE_JOB_ID}" ]]; then
+  cmd_start="$(cat "/tmp/fhc-cmd-start-${BUILDKITE_JOB_ID}")"
+  if paths_json="$(nix path-info --all --json 2>/dev/null \
+      | jq --compact-output --argjson t "$cmd_start" \
+          'to_entries | map(select((.value.registrationTime // 0) >= $t) | .key) | {store_paths: .}')"; then
+    n="$(jq '.store_paths | length' <<<"$paths_json")"
+    if (( n > 0 )); then
+      echo "Enqueueing ${n} store paths registered since the command started (nsh build outputs)"
+      curl -s -X POST -H 'Content-Type: application/json' \
+        -d "$paths_json" "http://${MAGIC_NIX_CACHE_LISTEN}/api/enqueue-paths" > /dev/null \
+        || echo "WARNING: enqueue-paths failed; FlakeHub upload set may be incomplete"
+    fi
   fi
 fi
+rm -f "/tmp/fhc-cmd-start-${BUILDKITE_JOB_ID}"
 
 # Drain Magic Nix Cache
 rc=0
