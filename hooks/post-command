@@ -5,6 +5,8 @@ export MAGIC_NIX_CACHE_LISTEN="127.0.0.1:37515"
 
 upload_logs="${BUILDKITE_PLUGIN_FLAKEHUB_CACHE_UPLOAD_LOGS:-"true"}"
 push_enabled="${BUILDKITE_PLUGIN_FLAKEHUB_CACHE_PUSH:-true}"
+plugin_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+mnc_log_file="/tmp/mnc-${BUILDKITE_JOB_ID}.log"
 
 if [[ "${push_enabled}" != "true" ]]; then
   echo "push disabled; no Magic Nix Cache to drain"
@@ -39,6 +41,19 @@ if [[ "${BUILDKITE_COMMAND:-}" == *"nsh://"* ]] \
       curl -sf -X POST -H 'Content-Type: application/json' \
         -d @"$payload" "http://${MAGIC_NIX_CACHE_LISTEN}/api/enqueue-paths" > /dev/null \
         || echo "WARNING: enqueue-paths failed (HTTP or transport); FlakeHub upload set may be incomplete"
+      # mnc keeps only what FlakeHub's get-missing-paths calls missing, and
+      # that answer is org-wide while this job's reads are cache-scoped: any
+      # output the elastic twin built first is silently dropped there. Push
+      # those ourselves, straight to upload-path (see lib/force-upload.sh).
+      # The cache name is the one mnc resolved for this job.
+      cache_name="$(sed -n 's/.*Using cache "\([^"]*\)".*/\1/p' "${mnc_log_file}" | head -n1)"
+      if [[ -n "${cache_name}" ]]; then
+        jq -r '.store_paths[]' "$payload" \
+          | bash "${plugin_dir}/lib/force-upload.sh" --diagnose "${cache_name}" \
+          || echo "WARNING: force-upload failed; FlakeHub cache may still lack nsh outputs"
+      else
+        echo "WARNING: no 'Using cache' line in ${mnc_log_file}; skipping force-upload"
+      fi
     fi
   fi
   rm -f "$payload"
@@ -54,7 +69,10 @@ if [[ $rc == 0 ]]; then
 fi
 
 if [[ $upload_logs == "true" ]]; then
-  buildkite-agent artifact upload "/tmp/mnc-${BUILDKITE_JOB_ID}.log"
+  # A failed log upload (Buildkite's artifact API answering 500) must not fail the job: the
+  # agent's automatic retry of a pipeline-upload step can never pass (duplicate step key).
+  buildkite-agent artifact upload "/tmp/mnc-${BUILDKITE_JOB_ID}.log" \
+    || echo "WARNING: the magic-nix-cache log was not uploaded as an artifact (exit $?)"
 else
   echo "Skipping log upload"
 fi

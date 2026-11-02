@@ -63,6 +63,30 @@ steps:
           push: false
 ```
 
+## nsh output force-upload (`--store nsh://` jobs)
+
+For jobs whose command builds via `--store nsh://`, `post-command` enqueues
+every store path registered since the command started into Magic Nix Cache
+(the TEMPORARY WORKAROUND in `hooks/post-command`). Magic Nix Cache then keeps
+only what FlakeHub's `get-missing-paths` calls missing, and that answer is
+org-wide while the job's narinfo reads are scoped to its own cache: any output
+another pipeline's cache already holds is reported "present" and silently
+dropped, so a pipeline's cache never receives outputs its twin built first.
+`lib/force-upload.sh` closes that gap right after the enqueue: it probes
+`<hash>.narinfo` with the job's token and `PUT`s every 404 straight to
+`/_api/v1/upload-path`. It prints one `force-upload:` line per path and one
+summary line, and never fails the job (errors are `force-upload: WARNING:`
+lines, exit status 0). `.drv` paths are left to Magic Nix Cache.
+
+Environment toggles (pipeline, step or agent environment; no plugin option):
+
+| Variable | Effect |
+| --- | --- |
+| `FLAKEHUB_CACHE_FORCE_UPLOAD=0` | skip the force-upload entirely |
+| `FLAKEHUB_CACHE_FORCE_UPLOAD_DRY_RUN=1` | probe and log what would be uploaded, upload nothing |
+| `FORCE_UPLOAD_PARALLEL` | concurrent uploads (default 4) |
+| `FORCE_UPLOAD_MAX_TIME` | seconds allowed per upload (default 1800) |
+
 ## Login keepalive
 
 FlakeHub sessions minted from Buildkite OIDC are short-lived, so in both modes

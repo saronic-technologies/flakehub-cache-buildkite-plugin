@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) and to [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/).
 
+## Unreleased (branch `nsh-force-upload`)
+
+### Bug Fixes
+- nsh outputs enqueued by the v3.6.x store scan were planned and then dropped by Magic Nix Cache: FlakeHub's `get-missing-paths` (the only filter left in mnc's push plan; `upstream_cache_key_names` is empty on every cache) answers org-wide, so any output another pipeline's cache already held was reported "present" and never uploaded to this pipeline's cache, which stayed empty (combined-pr-checks-slurm 9142: 580 paths enqueued, `uploads completed, paths: ["sysmanager2-webapp-0.0.1.drv"]`). `post-command` now runs `lib/force-upload.sh` after the enqueue: narinfo probes with the job token (reads are cache-scoped, 404 = this cache lacks it) and direct `PUT /_api/v1/upload-path` for the misses. One log line per path plus a summary; never fails the job; `FLAKEHUB_CACHE_FORCE_UPLOAD=0` disables it and `FLAKEHUB_CACHE_FORCE_UPLOAD_DRY_RUN=1` only reports. Still a TEMPORARY WORKAROUND pending a cache-scoped `get-missing-paths` or first-class push access from Determinate Systems.
+
 ## v3.6.2 (2026-09-18)
 
 ### Bug Fixes
