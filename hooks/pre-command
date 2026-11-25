@@ -171,21 +171,36 @@ case "${os}" in
     ;;
 esac
 (
-  echo "Waiting for Magic Nix Cache to start up..."
+  # The daemon talks to FlakeHub before it writes the startup file (the
+  # magic-nix-cache wrapper on the slurm runners resolves the project and
+  # fetches the cache config first, then the daemon logs in); on a fresh
+  # agent under a slow FlakeHub that takes longer than the 60 s upstream
+  # waits.  FLAKEHUB_CACHE_MNC_STARTUP_TIMEOUT (seconds, default 180)
+  # bounds the wait; the daemon log is shown when it still does not come up.
+  timeout="${FLAKEHUB_CACHE_MNC_STARTUP_TIMEOUT:-180}"
+  attempts=$(( timeout / 2 ))
+  echo "Waiting for Magic Nix Cache to start up (up to ${timeout} s)..."
   started=0
-  for n in {1..30}; do
+  for (( n = 1; n <= attempts; n++ )); do
     if [ -e "${mnc_startup_file}" ]; then
       echo "Magic Nix Cache daemon has successfully started up after ${n} attempt(s)"
       started=1
       break
     else
-      echo "Waiting on Magic Nix Cache daemon; on attempt ${n}"
+      if (( n % 5 == 1 )); then
+        echo "Waiting on Magic Nix Cache daemon; on attempt ${n} of ${attempts}"
+      fi
       sleep 2
     fi
   done
 
   if [[ "${started}" != "1" ]]; then
-    echo "The Magic Nix Cache daemon did not start up within 60 seconds; exiting"
+    echo "The Magic Nix Cache daemon did not start up within ${timeout} seconds; exiting"
+    if [ -s "${mnc_log_file}" ]; then
+      echo "--- last lines of the daemon log (${mnc_log_file}) ---"
+      tail -n 20 "${mnc_log_file}"
+      echo "--- end of the daemon log ---"
+    fi
     exit 1
   fi
 )
